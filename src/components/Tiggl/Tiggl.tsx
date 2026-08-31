@@ -26,6 +26,7 @@ import {
   scoreDigits,
   timeBonusForClear,
 } from '@/lib/game';
+import { version } from '@/lib/version';
 
 const gap = 8;
 const spring = 0.04;
@@ -1948,6 +1949,9 @@ export const Tiggl = () => {
             <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
               Tiggl
             </h1>
+            <p className="mt-2 font-mono text-[11px] tabular-nums text-zinc-500">
+              v{version}
+            </p>
             <p className="mt-4 max-w-md text-pretty text-zinc-300">
               Chase the circles through ten levels. Avoid the bad eggs — a bump
               will crash the round.
@@ -1971,6 +1975,9 @@ export const Tiggl = () => {
             <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
               Tiggl
             </h1>
+            <p className="mt-2 font-mono text-[11px] tabular-nums text-zinc-500">
+              v{version}
+            </p>
             <p className="mt-4 max-w-md text-pretty text-zinc-300">
               This version needs a mouse or trackpad. Open it on a computer to
               play.
