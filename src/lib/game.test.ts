@@ -1,5 +1,7 @@
 import {
   badsOnLevel,
+  boardHeight,
+  boardWidth,
   formatHudScore,
   formatPlayTime,
   goodsOnLevel,
@@ -32,5 +34,10 @@ describe('scoring', () => {
   it('pads the HUD score to the maximum width', () => {
     expect(formatHudScore(0)).toHaveLength(scoreDigits);
     expect(formatPlayTime(65_000)).toBe('1:05');
+  });
+
+  it('uses a fixed playfield size', () => {
+    expect(boardWidth).toBe(1280);
+    expect(boardHeight).toBe(800);
   });
 });

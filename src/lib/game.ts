@@ -1,3 +1,5 @@
+export const boardWidth = 1280;
+export const boardHeight = 800;
 export const maxLevel = 10;
 export const playCount = 99;
 export const badsPerLevel = 9;

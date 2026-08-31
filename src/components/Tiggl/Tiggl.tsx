@@ -14,6 +14,8 @@ import {
 import {
   badsOnLevel,
   badsPerLevel,
+  boardHeight,
+  boardWidth,
   formatHudScore,
   formatPlayTime,
   formatScore,
@@ -101,10 +103,24 @@ const squareAt = (
   };
 };
 
-const restOf = (square: Square, width: number, height: number) => ({
-  x: width - square.right - square.size,
-  y: height - square.bottom - square.size,
+const restOf = (square: Square) => ({
+  x: boardWidth - square.right - square.size,
+  y: boardHeight - square.bottom - square.size,
 });
+
+const boardPoint = (
+  event: { clientX: number; clientY: number },
+  overlay: HTMLElement,
+): Pointer => {
+  const rect = overlay.getBoundingClientRect();
+  const width = rect.width || boardWidth;
+  const height = rect.height || boardHeight;
+
+  return {
+    x: ((event.clientX - rect.left) / width) * boardWidth,
+    y: ((event.clientY - rect.top) / height) * boardHeight,
+  };
+};
 
 const squareTransform = (ox: number, oy: number, scale = 1) => {
   const moved = Math.abs(ox) >= 0.05 || Math.abs(oy) >= 0.05;
@@ -160,11 +176,11 @@ const circlesTouch = (
 
 const ballRadius = (size: number, pad = collidePad) => size / 2 + pad;
 
-const tableBounds = (width: number, height: number) => ({
+const tableBounds = () => ({
   minX: tablePad,
-  minY: Math.max(tableTopMin, height * 0.2),
-  maxX: width - tablePad,
-  maxY: height - tablePadBottom,
+  minY: Math.max(tableTopMin, boardHeight * 0.2),
+  maxX: boardWidth - tablePad,
+  maxY: boardHeight - tablePadBottom,
 });
 
 const circlesClear = (
@@ -227,22 +243,13 @@ const packInBox = (
   return spots;
 };
 
-const pickSpreadTargets = (
-  squares: Square[],
-  width: number,
-  height: number,
-) => {
-  const { minX, minY, maxX, maxY } = tableBounds(width, height);
+const pickSpreadTargets = (squares: Square[]) => {
+  const { minX, minY, maxX, maxY } = tableBounds();
   return packInBox(squares, minX, minY, maxX, maxY, scatterGap);
 };
 
-const clusterOnTable = (
-  squares: Square[],
-  sim: Particle[],
-  width: number,
-  height: number,
-) => {
-  const { minX, minY, maxX, maxY } = tableBounds(width, height);
+const clusterOnTable = (squares: Square[], sim: Particle[]) => {
+  const { minX, minY, maxX, maxY } = tableBounds();
   const midX = (minX + maxX) / 2;
   const midY = (minY + maxY) / 2;
   const halfW = Math.min(170, (maxX - minX) * 0.2);
@@ -267,13 +274,13 @@ const clusterOnTable = (
   for (let n = 0; n < 48; n += 1) {
     resolveCollisions(squares, sim, none, 4);
     for (let i = 0; i < squares.length; i += 1) {
-      bounceTable(sim[i], squares[i].size, width, height);
+      bounceTable(sim[i], squares[i].size);
       sim[i].vx = 0;
       sim[i].vy = 0;
     }
   }
 
-  return pickSpreadTargets(squares, width, height);
+  return pickSpreadTargets(squares);
 };
 
 const resolveCollisions = (
@@ -347,11 +354,9 @@ const resolveCollisions = (
 const bounceTable = (
   particle: Particle,
   size: number,
-  width: number,
-  height: number,
   onWall?: (speed: number) => void,
 ) => {
-  const { minX, minY, maxX, maxY } = tableBounds(width, height);
+  const { minX, minY, maxX, maxY } = tableBounds();
 
   if (particle.x < minX) {
     const speed = Math.abs(particle.vx);
@@ -993,11 +998,7 @@ export const Tiggl = () => {
       return;
     }
 
-    const rect = overlay.getBoundingClientRect();
-    const next = createSquares(
-      Math.max(rect.width, 1),
-      Math.max(rect.height, 1),
-    );
+    const next = createSquares(boardWidth, boardHeight);
     squaresRef.current = next;
     idleSquaresRef.current = next;
     simRef.current = [];
@@ -1018,7 +1019,6 @@ export const Tiggl = () => {
       return;
     }
 
-    const rect = overlay.getBoundingClientRect();
     const layout = squaresRef.current;
     const sim = simRef.current;
 
@@ -1034,7 +1034,7 @@ export const Tiggl = () => {
         continue;
       }
 
-      const rest = restOf(layout[i], rect.width, rect.height);
+      const rest = restOf(layout[i]);
       node.style.transform = squareTransform(
         particle.x - rest.x,
         particle.y - rest.y,
@@ -1064,11 +1064,7 @@ export const Tiggl = () => {
       return null;
     }
 
-    const rect = overlay.getBoundingClientRect();
-    return {
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    };
+    return boardPoint(event, overlay);
   };
 
   const showCatcher = (point: Pointer) => {
@@ -1106,12 +1102,6 @@ export const Tiggl = () => {
   };
 
   const tossOntoTable = (resetClock = true) => {
-    const overlay = overlayRef.current;
-    if (!overlay) {
-      return;
-    }
-
-    const rect = overlay.getBoundingClientRect();
     const layout = Array.from({ length: playCount }, () => ({
       size: 14 + Math.round(Math.random() * 34),
       right: 8 + Math.random() * 48,
@@ -1120,19 +1110,14 @@ export const Tiggl = () => {
     }));
 
     simRef.current = layout.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 }));
-    scatterTargetsRef.current = clusterOnTable(
-      layout,
-      simRef.current,
-      rect.width,
-      rect.height,
-    );
+    scatterTargetsRef.current = clusterOnTable(layout, simRef.current);
 
     for (let i = 0; i < layout.length; i += 1) {
       const particle = simRef.current[i];
-      layout[i].right = rect.width - particle.x - layout[i].size;
-      layout[i].bottom = rect.height - particle.y - layout[i].size;
-      particle.x = restOf(layout[i], rect.width, rect.height).x;
-      particle.y = restOf(layout[i], rect.width, rect.height).y;
+      layout[i].right = boardWidth - particle.x - layout[i].size;
+      layout[i].bottom = boardHeight - particle.y - layout[i].size;
+      particle.x = restOf(layout[i]).x;
+      particle.y = restOf(layout[i]).y;
       particle.vx = 0;
       particle.vy = 0;
     }
@@ -1316,8 +1301,6 @@ export const Tiggl = () => {
     catcherRef.current?.classList.remove('is-on');
 
     const idle = idleSquaresRef.current;
-    const overlay = overlayRef.current;
-    const rect = overlay?.getBoundingClientRect();
 
     caughtRef.current = idle.map(() => false);
     scoreRef.current = 0;
@@ -1327,12 +1310,10 @@ export const Tiggl = () => {
     levelRef.current = 1;
     restoreIdle();
 
-    if (rect) {
-      simRef.current = idle.map(square => {
-        const rest = restOf(square, rect.width, rect.height);
-        return { x: rest.x, y: rest.y, vx: 0, vy: 0 };
-      });
-    }
+    simRef.current = idle.map(square => {
+      const rest = restOf(square);
+      return { x: rest.x, y: rest.y, vx: 0, vy: 0 };
+    });
 
     for (const node of nodesRef.current) {
       if (node) {
@@ -1425,7 +1406,6 @@ export const Tiggl = () => {
 
       const layout = squaresRef.current;
       const caught = caughtRef.current;
-      const rect = overlay.getBoundingClientRect();
       const sim = simRef.current;
       const now = Date.now();
       const holding = playingRef.current && now < holdUntilRef.current;
@@ -1436,7 +1416,7 @@ export const Tiggl = () => {
       const targets = scatterTargetsRef.current;
 
       if (scattering && targets) {
-        const { minX, minY, maxX, maxY } = tableBounds(rect.width, rect.height);
+        const { minX, minY, maxX, maxY } = tableBounds();
         const midX = (minX + maxX) / 2;
         const midY = (minY + maxY) / 2;
         let impulses = scatterImpulseRef.current;
@@ -1518,7 +1498,7 @@ export const Tiggl = () => {
       if (sim.length !== layout.length) {
         sim.length = 0;
         for (const square of layout) {
-          const rest = restOf(square, rect.width, rect.height);
+          const rest = restOf(square);
           sim.push({ x: rest.x, y: rest.y, vx: 0, vy: 0 });
         }
       }
@@ -1561,7 +1541,7 @@ export const Tiggl = () => {
 
             const square = layout[i];
             const particle = sim[i];
-            const rest = restOf(square, rect.width, rect.height);
+            const rest = restOf(square);
 
             if (!playingRef.current && !frozenRef.current) {
               particle.vx += (rest.x - particle.x) * spring * stepForce;
@@ -1597,8 +1577,6 @@ export const Tiggl = () => {
               bounceTable(
                 particle,
                 square.size,
-                rect.width,
-                rect.height,
                 holding || scattering ? undefined : playCollide,
               );
             }
@@ -1624,7 +1602,7 @@ export const Tiggl = () => {
                   for (let index = 0; index < layout.length; index += 1) {
                     const square = layout[index];
                     const particle = sim[index];
-                    const rest = restOf(square, rect.width, rect.height);
+                    const rest = restOf(square);
                     const node = nodesRef.current[index];
                     if (node && !reduceMotion) {
                       node.style.transform = squareTransform(
@@ -1661,8 +1639,6 @@ export const Tiggl = () => {
                 bounceTable(
                   sim[i],
                   layout[i].size,
-                  rect.width,
-                  rect.height,
                   holding || scattering ? undefined : playCollide,
                 );
               }
@@ -1724,7 +1700,7 @@ export const Tiggl = () => {
               gained += 1;
               const node = nodesRef.current[index];
               if (node) {
-                const rest = restOf(layout[index], rect.width, rect.height);
+                const rest = restOf(layout[index]);
                 const particle = sim[index];
                 node.style.transform = squareTransform(
                   particle.x - rest.x,
@@ -1756,7 +1732,7 @@ export const Tiggl = () => {
       for (let i = 0; i < layout.length; i += 1) {
         const square = layout[i];
         const particle = sim[i];
-        const rest = restOf(square, rect.width, rect.height);
+        const rest = restOf(square);
         const ox = reduceMotion ? 0 : particle.x - rest.x;
         const oy = reduceMotion ? 0 : particle.y - rest.y;
         const node = nodesRef.current[i];
@@ -1822,11 +1798,7 @@ export const Tiggl = () => {
     startRef.current = start;
 
     const onMove = (event: PointerEvent) => {
-      const rect = overlay.getBoundingClientRect();
-      const point = {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      };
+      const point = boardPoint(event, overlay);
 
       if (!playingRef.current) {
         pointerRef.current = point;
@@ -1880,7 +1852,8 @@ export const Tiggl = () => {
 
   return (
     <div
-      className={`relative isolate min-h-dvh overflow-hidden bg-zinc-950 text-zinc-50${playing || frozen ? ' catch-playing' : ''}`}
+      className={`relative isolate shrink-0 overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50${playing || frozen ? ' catch-playing' : ''}`}
+      style={{ width: boardWidth, height: boardHeight }}
     >
       <div
         ref={overlayRef}
@@ -1924,7 +1897,7 @@ export const Tiggl = () => {
       </div>
       <span ref={catcherRef} className="hero-catcher" aria-hidden />
       {canPlay && (playing || frozen) ? (
-        <div className="pointer-events-none absolute top-6 left-8 z-30 sm:top-8 sm:left-12 lg:top-12 lg:left-14">
+        <div className="pointer-events-none absolute top-8 left-12 z-30">
           <p className="flex flex-wrap items-center gap-x-3 gap-y-2 font-display text-sm leading-none text-zinc-50 [text-shadow:0_1px_10px_rgb(0_0_0/0.85)]">
             <span className="bg-white px-2 py-1 text-sm font-semibold text-zinc-950 [text-shadow:none]">
               Tiggl
@@ -1969,12 +1942,12 @@ export const Tiggl = () => {
         </div>
       ) : null}
       {canPlay === true && !playing && !frozen && !hasPlayed ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-8 py-8 sm:px-12 sm:py-12 lg:px-14 lg:py-14">
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-12 py-12">
           <div className="max-w-xl">
             <p className="text-[11px] font-semibold tracking-[0.28em] text-zinc-400 uppercase">
               Tay Digital
             </p>
-            <h1 className="mt-3 font-display text-6xl font-semibold tracking-tight text-white sm:text-7xl">
+            <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
               Tiggl
             </h1>
             <p className="mt-4 max-w-md text-pretty text-zinc-300">
@@ -1992,12 +1965,12 @@ export const Tiggl = () => {
         </div>
       ) : null}
       {canPlay === false && !playing && !frozen ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-8 py-8 sm:px-12 sm:py-12 lg:px-14 lg:py-14">
+        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-12 py-12">
           <div className="max-w-xl">
             <p className="text-[11px] font-semibold tracking-[0.28em] text-zinc-400 uppercase">
               Tay Digital
             </p>
-            <h1 className="mt-3 font-display text-6xl font-semibold tracking-tight text-white sm:text-7xl">
+            <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
               Tiggl
             </h1>
             <p className="mt-4 max-w-md text-pretty text-zinc-300">
@@ -2008,7 +1981,7 @@ export const Tiggl = () => {
         </div>
       ) : null}
       {canPlay && (playing || frozen) ? (
-        <div className="pointer-events-none absolute inset-x-8 bottom-6 z-30 flex flex-wrap items-center gap-x-6 gap-y-2 sm:inset-x-12 sm:bottom-8 lg:inset-x-14 lg:bottom-10">
+        <div className="pointer-events-none absolute inset-x-12 bottom-8 z-30 flex flex-wrap items-center gap-x-6 gap-y-2">
           {frozen ? (
             <p
               className="flex items-center gap-3 bg-brand px-4 py-2 text-white"

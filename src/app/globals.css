@@ -128,10 +128,12 @@
 
   html {
     @apply font-sans;
+    min-height: 100dvh;
   }
 
   body {
     @apply bg-background text-foreground antialiased;
+    min-height: 100dvh;
   }
 
   ::selection {

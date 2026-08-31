@@ -51,13 +51,13 @@ const RootLayout = ({ children }: LayoutProps<'/'>) => {
     <html
       lang="en-GB"
       className={cn(
-        'dark h-full antialiased',
+        'dark min-h-dvh antialiased',
         sourceSerif.variable,
         publicSans.variable,
         geistMono.variable,
       )}
     >
-      <body className="min-h-full bg-zinc-950 font-sans text-zinc-50">
+      <body className="min-h-dvh bg-zinc-900 font-sans text-zinc-50">
         {children}
         <Analytics />
       </body>
