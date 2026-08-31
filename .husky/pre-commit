@@ -1,1 +1,28 @@
+echo "🧪 Running tests..."
+
+if ! npm test; then
+    echo ""
+    echo "❌ COMMIT BLOCKED: Tests failed!"
+    echo ""
+    echo "🔧 Run 'npm test' to see detailed failures"
+    echo ""
+    exit 1
+fi
+
+echo "✅ All tests passed!"
+
+# Run type checking
+echo "📝 Type checking..."
+npm run type-check
+
+# Run linting on entire codebase
+echo "🔧 Linting..."
+npm run lint
+
+# Run build to ensure everything compiles
+echo "🏗️  Building..."
+npm run build
+
+echo "✅ Pre-commit checks passed!"
+
 npx lint-staged

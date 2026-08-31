@@ -19,10 +19,12 @@
 
 # production
 /build
+/dist
 
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -42,9 +44,16 @@ yarn-error.log*
 next-env.d.ts
 
 # IDE
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/*.code-workspace
 .idea/
 *.swp
 *.swo
+
+# Allow shared VSCode settings at repo root only
+!/.vscode/settings.json
+!/.vscode/extensions.json
 
 # OS / local
 TODO.md

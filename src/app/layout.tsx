@@ -3,9 +3,8 @@ import { Geist_Mono, Public_Sans, Source_Serif_4 } from 'next/font/google';
 
 import { Analytics } from '@vercel/analytics/next';
 
-import { cn } from '@/lib/utils';
-
 import './globals.css';
+import { cn } from '@/lib/utils';
 
 const sourceSerif = Source_Serif_4({
   subsets: ['latin'],

@@ -1,7 +1,5 @@
 'use client';
 
-/* eslint-disable react-hooks/immutability, react-hooks/refs -- game loop mutates particle refs and DOM every frame */
-
 import {
   memo,
   type RefObject,

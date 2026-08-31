@@ -2,6 +2,7 @@
 commit_msg=$(cat "$1")
 
 # Conventional commit pattern: type(scope): description
+# Examples: feat: add new feature, fix(auth): resolve login issue, docs: update README
 pattern="^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?: .{1,50}"
 
 if ! echo "$commit_msg" | grep -qE "$pattern"; then

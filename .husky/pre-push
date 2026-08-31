@@ -1,0 +1,4 @@
+echo "Pushing changes..."
+
+# All checks now happen in pre-commit, so this is just a confirmation
+echo "✅ All pre-commit checks passed, pushing to remote!"
