@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+coverage/
+
+# Logs
+*.log
+
+# Environment files
+.env*
+!.env.example
+
+# Generated files
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Package managers
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Vercel
+.vercel/
+
+# Plans / local notes
+TODO.md
