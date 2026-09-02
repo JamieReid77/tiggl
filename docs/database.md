@@ -53,7 +53,6 @@ Names only. Never commit values. Never prefix these with `NEXT_PUBLIC_`.
 - `DATABASE_NAME` — `postgres`
 - `DATABASE_USER` — `tiggl_runtime.bppqtotktgchvitcmbmj` on the pooler
 - `TIGGL_RUNTIME_PASSWORD`
-- `TIGGL_MIGRATOR_PASSWORD` (CI only)
 
 ## Auth
 
@@ -86,15 +85,7 @@ Off. Scores are read and written by Next.js server actions as `tiggl_runtime`. D
 
 ## Backup
 
-```sh
-APP_SLUG=tiggl SOURCE_DATABASE_URL="$TIGGL_MIGRATOR_DATABASE_URL" ./db/export.sh
-```
-
-`export.sh` dumps Tiggl schemas only. It does not restore.
-
-## Migration-out
-
-Portable unit: `tiggl`, `tiggl_auth`, this inventory. No Storage. No Watchlist objects.
+Dumps and host isolation checks live in the `supabase` repo (`apps/tiggl/db/`), not here. This repo only keeps the SQL migrations the app applies.
 
 ## Data retention
 
