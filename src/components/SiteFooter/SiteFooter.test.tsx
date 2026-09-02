@@ -8,10 +8,10 @@ describe('SiteFooter', () => {
 
     expect(screen.getByText('Tiggl')).toBeInTheDocument();
     expect(screen.getByText(/is an original game by/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Tay Digital' })).toHaveAttribute(
-      'href',
-      'https://taydigital.co.uk',
-    );
+    const tayDigital = screen.getByRole('link', { name: 'Tay Digital' });
+    expect(tayDigital).toHaveAttribute('href', 'https://taydigital.co.uk');
+    expect(tayDigital).toHaveAttribute('target', '_blank');
+    expect(tayDigital).toHaveAttribute('rel', 'noopener noreferrer');
     expect(
       screen.getByText(new RegExp(`© ${new Date().getFullYear()}`)),
     ).toBeInTheDocument();
