@@ -972,6 +972,18 @@ HudLeftover.displayName = 'HudLeftover';
 const playLink =
   'pointer-events-auto cursor-pointer text-[11px] text-zinc-400 underline decoration-zinc-500 underline-offset-4 [text-shadow:0_1px_10px_rgb(0_0_0/0.85)] transition-colors hover:text-white hover:decoration-brand focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 motion-reduce:transition-none';
 
+const introShell =
+  'pointer-events-none absolute inset-0 z-20 flex flex-col justify-start px-5 py-6 sm:px-10 sm:py-10 md:px-12 md:py-12';
+
+const blockedShell =
+  'relative z-20 flex flex-col justify-start px-5 py-8 sm:px-10 sm:py-10 md:px-12 md:py-12';
+
+const introTitle =
+  'font-display text-4xl font-semibold tracking-tight text-white sm:text-6xl md:text-7xl';
+
+const introCopy =
+  'mt-4 max-w-2xl text-pretty text-base leading-relaxed text-zinc-300 sm:mt-8 sm:text-lg';
+
 export const Tiggl = () => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const nodesRef = useRef<(HTMLSpanElement | null)[]>([]);
@@ -2310,12 +2322,26 @@ export const Tiggl = () => {
     ? `Clear! ${formatScore(score)} points, ten levels, ${playTimeLabel(elapsedMs)}`
     : `TIG! You're caught! ${formatScore(score)} points, level ${level}, ${playTimeLabel(elapsedMs)}`;
 
+  const blocked = canPlay === false;
+
   return (
-    <div className="flex items-start gap-4">
-      <div className="flex flex-col gap-3">
+    <div
+      className={
+        blocked
+          ? 'grid w-full min-w-0 grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_14rem]'
+          : 'flex items-stretch gap-4'
+      }
+    >
+      <div
+        className={blocked ? 'flex min-w-0 flex-col' : 'flex flex-col gap-3'}
+      >
         <div
-          className={`relative shrink-0 overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]${playing || frozen ? ' catch-playing' : ''}`}
-          style={{ width: boardWidth, height: boardHeight }}
+          className={`relative overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]${playing || frozen ? ' catch-playing' : ''}${
+            blocked ? ' h-auto w-full lg:h-full' : ' shrink-0'
+          }`}
+          style={
+            blocked ? undefined : { width: boardWidth, height: boardHeight }
+          }
         >
           <div
             ref={overlayRef}
@@ -2412,12 +2438,10 @@ export const Tiggl = () => {
             </div>
           ) : null}
           {canPlay === true && !playing && !frozen && !hasPlayed ? (
-            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-start px-12 py-12">
+            <div className={introShell}>
               <div className="max-w-2xl">
-                <h1 className="font-display text-7xl font-semibold tracking-tight text-white">
-                  Tiggl.
-                </h1>
-                <p className="mt-8 max-w-2xl text-pretty text-lg leading-relaxed text-zinc-300">
+                <h1 className={introTitle}>Tiggl.</h1>
+                <p className={introCopy}>
                   Move the mouse to steer the puck and collect the circles.
                   Sweep through the good ones but don’t let a nudge turn into a
                   crash! The first level isn’t a tutorial — it’s where most
@@ -2434,12 +2458,10 @@ export const Tiggl = () => {
             </div>
           ) : null}
           {canPlay === false && !playing && !frozen ? (
-            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-start px-12 py-12">
+            <div className={blockedShell}>
               <div className="max-w-2xl">
-                <h1 className="font-display text-7xl font-semibold tracking-tight text-white">
-                  Tiggl.
-                </h1>
-                <p className="mt-8 max-w-2xl text-pretty text-lg leading-relaxed text-zinc-300">
+                <h1 className={introTitle}>Tiggl.</h1>
+                <p className={introCopy}>
                   This version needs a mouse or trackpad. Open it on a computer
                   to play.
                 </p>
@@ -2560,6 +2582,7 @@ export const Tiggl = () => {
         loading={scoresLoading}
         plays={playCounts}
         onBoardChange={setScoreBoard}
+        fluid={blocked}
       />
     </div>
   );

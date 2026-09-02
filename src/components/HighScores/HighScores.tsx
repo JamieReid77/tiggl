@@ -38,6 +38,7 @@ export type HighScoresProps = {
   loading?: boolean;
   onBoardChange?: (board: ScoreBoard) => void;
   plays?: PlayCounts;
+  fluid?: boolean;
 };
 
 const rankTone = (rank: number, filled: boolean) => {
@@ -119,6 +120,7 @@ export const HighScores = ({
   loading = false,
   onBoardChange,
   plays = emptyPlayCounts(),
+  fluid = false,
 }: HighScoresProps) => {
   const titleId = useId();
   const periodId = useId();
@@ -128,12 +130,14 @@ export const HighScores = ({
 
   return (
     <aside
-      className="flex w-56 shrink-0 flex-col border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]"
-      style={{ height: boardHeight }}
+      className={`flex flex-col border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)] ${
+        fluid ? 'h-full min-h-0 w-full min-w-0' : 'w-56 shrink-0'
+      }`}
+      style={fluid ? undefined : { height: boardHeight }}
       aria-labelledby={titleId}
       aria-busy={loading}
     >
-      <header className="flex flex-1 items-center justify-center px-4">
+      <header className="flex flex-1 items-center justify-center px-5 py-10">
         <div className="text-center">
           <h2
             id={titleId}
@@ -178,7 +182,7 @@ export const HighScores = ({
         ) : null}
       </div>
       <div
-        className="flex flex-1 items-center justify-center px-4"
+        className="flex flex-1 items-center justify-center px-5 py-10"
         aria-label={`${plays[board].toLocaleString('en-GB')} plays ${playCountPeriod[board]}`}
       >
         <div className="text-center">

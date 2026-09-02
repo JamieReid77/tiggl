@@ -70,4 +70,13 @@ describe('HighScores', () => {
     );
     expect(onBoardChange).toHaveBeenCalledWith('allTime');
   });
+
+  it('fills the viewport width when fluid', () => {
+    render(<HighScores fluid rows={[row]} />);
+
+    expect(screen.getByRole('complementary')).toHaveClass('w-full');
+    expect(screen.getByRole('complementary')).not.toHaveStyle({
+      height: '800px',
+    });
+  });
 });
