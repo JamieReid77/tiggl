@@ -10,6 +10,17 @@ import {
 } from 'react';
 
 import {
+  listHighScoreBoards,
+  recordPlay,
+  submitHighScore,
+} from '@/app/actions/highScores';
+import {
+  HighScoreEntry,
+  type HighScoreRun,
+  HighScores,
+  ScoreCelebration,
+} from '@/components/HighScores';
+import {
   badsOnLevel,
   badsPerLevel,
   boardHeight,
@@ -26,8 +37,17 @@ import {
   scoreDigits,
   timeBonusForClear,
 } from '@/lib/game';
-import { version } from '@/lib/version';
-
+import {
+  emptyPlayCounts,
+  type HighScore,
+  offerForNewScore,
+  type PlayCounts,
+  qualifiesForBoard,
+  type ScoreBoard,
+  scoreMovedCopy,
+  type ScoreOffer,
+} from '@/lib/highScores';
+import { anonymousName } from '@/lib/playerName';
 const gap = 8;
 const spring = 0.04;
 const damping = 0.82;
@@ -43,13 +63,36 @@ const repelMin = 2.4;
 const repelMax = 8.5;
 const substeps = 4;
 const tablePad = 48;
-const tablePadBottom = 128;
-const tableTopMin = 128;
+const tableChromeTop = 92;
+const tableChromeBottom = 52;
+const tableBandPad = 40;
 const hitGraceMs = 400;
 const holdMs = 1300;
 const scatterMs = 2600;
 const scatterPushMs = 720;
 const levelPauseMs = 1800;
+const resultSettleMs = 1200;
+const replayGatherMs = 800;
+
+const emptyScoreBoards = (): Record<ScoreBoard, HighScore[]> => ({
+  monthly: [],
+  allTime: [],
+});
+
+const listedBoardForRow = (
+  id: string,
+  boards: Record<ScoreBoard, HighScore[]>,
+): ScoreBoard | null => {
+  if (boards.monthly.some(row => row.id === id)) {
+    return 'monthly';
+  }
+
+  if (boards.allTime.some(row => row.id === id)) {
+    return 'allTime';
+  }
+
+  return null;
+};
 
 type Square = {
   size: number;
@@ -177,10 +220,41 @@ const ballRadius = (size: number, pad = collidePad) => size / 2 + pad;
 
 const tableBounds = () => ({
   minX: tablePad,
-  minY: Math.max(tableTopMin, boardHeight * 0.2),
+  minY: tableChromeTop + tableBandPad,
   maxX: boardWidth - tablePad,
-  maxY: boardHeight - tablePadBottom,
+  maxY: boardHeight - tableChromeBottom - tableBandPad,
 });
+
+const recenterOnTable = (squares: Square[], sim: Particle[]) => {
+  const { minX, minY, maxX, maxY } = tableBounds();
+  let minCx = Infinity;
+  let maxCx = -Infinity;
+  let minCy = Infinity;
+  let maxCy = -Infinity;
+
+  for (let i = 0; i < squares.length; i += 1) {
+    const particle = sim[i];
+    const size = squares[i].size;
+    const cx = particle.x + size / 2;
+    const cy = particle.y + size / 2;
+    minCx = Math.min(minCx, cx);
+    maxCx = Math.max(maxCx, cx);
+    minCy = Math.min(minCy, cy);
+    maxCy = Math.max(maxCy, cy);
+  }
+
+  const dx = (minX + maxX) / 2 - (minCx + maxCx) / 2;
+  const dy = (minY + maxY) / 2 - (minCy + maxCy) / 2;
+
+  for (const particle of sim) {
+    particle.x += dx;
+    particle.y += dy;
+  }
+
+  for (let i = 0; i < squares.length; i += 1) {
+    bounceTable(sim[i], squares[i].size);
+  }
+};
 
 const circlesClear = (
   ax: number,
@@ -278,6 +352,8 @@ const clusterOnTable = (squares: Square[], sim: Particle[]) => {
       sim[i].vy = 0;
     }
   }
+
+  recenterOnTable(squares, sim);
 
   return pickSpreadTargets(squares);
 };
@@ -935,6 +1011,7 @@ export const Tiggl = () => {
   const scatterPushedRef = useRef(false);
   const scatterImpulseRef = useRef<ScatterImpulse[] | null>(null);
   const scatterTargetsRef = useRef<{ x: number; y: number }[] | null>(null);
+  const gatherFromRef = useRef<{ x: number; y: number }[] | null>(null);
   const scatterLockedRef = useRef(false);
   const levelClearingRef = useRef(false);
   const levelPauseUntilRef = useRef(0);
@@ -954,6 +1031,146 @@ export const Tiggl = () => {
   const [activeList, setActiveList] = useState<boolean[]>([]);
   const [won, setWon] = useState(false);
   const [canPlay, setCanPlay] = useState<boolean | null>(null);
+  const [scoreBoard, setScoreBoard] = useState<ScoreBoard>('monthly');
+  const [scoreBoardsRows, setScoreBoardsRows] = useState<
+    Record<ScoreBoard, HighScore[]>
+  >({
+    monthly: [],
+    allTime: [],
+  });
+  const [scoreHighlightId, setScoreHighlightId] = useState<string | null>(null);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
+  const [scoresError, setScoresError] = useState<string | null>(null);
+  const [scoresLoading, setScoresLoading] = useState(true);
+  const [playCounts, setPlayCounts] = useState<PlayCounts>(emptyPlayCounts);
+  const [pendingHighScore, setPendingHighScore] = useState(false);
+  const [scoreOffer, setScoreOffer] = useState<ScoreOffer | null>(null);
+  const celebration = scoreOffer;
+  const madeTen = Boolean(
+    celebration ??
+    (frozen
+      ? offerForNewScore({
+          score,
+          monthly: scoreBoardsRows.monthly,
+          allTime: scoreBoardsRows.allTime,
+        })
+      : null),
+  );
+  const [boardMoved, setBoardMoved] = useState(false);
+  const playRecordedRef = useRef(false);
+  const pendingScoreRef = useRef<HighScoreRun | null>(null);
+  const pendingCaptureRef = useRef<HighScoreRun | null>(null);
+  const pendingOfferRef = useRef<ScoreOffer | null>(null);
+  const scoreCommitRef = useRef(false);
+  const offerTimerRef = useRef(0);
+
+  const clearOfferReveal = () => {
+    window.clearTimeout(offerTimerRef.current);
+    offerTimerRef.current = 0;
+  };
+
+  const resetNameEntry = () => {
+    clearOfferReveal();
+    setScoreHighlightId(null);
+    setNameError(null);
+    setSavingName(false);
+    setBoardMoved(false);
+    setScoreOffer(null);
+    pendingOfferRef.current = null;
+  };
+
+  const showListedBoards = (
+    listed: Extract<
+      Awaited<ReturnType<typeof listHighScoreBoards>>,
+      { ok: true }
+    >,
+    rowId?: string,
+  ) => {
+    setScoreBoardsRows(listed.boards);
+    setPlayCounts(listed.plays);
+    setScoresError(null);
+
+    if (!rowId) {
+      return true;
+    }
+
+    const board = listedBoardForRow(rowId, listed.boards);
+
+    if (board) {
+      setScoreBoard(board);
+      setScoreHighlightId(rowId);
+      setBoardMoved(false);
+      return true;
+    }
+
+    setScoreHighlightId(null);
+    if (frozenRef.current) {
+      setBoardMoved(true);
+    }
+    return false;
+  };
+
+  const stillOnBoard = (
+    score: number,
+    boards: Record<ScoreBoard, HighScore[]>,
+  ) => {
+    const offer = pendingOfferRef.current;
+    return offer ? qualifiesForBoard(score, boards[offer.board]) : false;
+  };
+
+  const dropPendingScore = () => {
+    clearOfferReveal();
+    pendingScoreRef.current = null;
+    pendingCaptureRef.current = null;
+    pendingOfferRef.current = null;
+    setPendingHighScore(false);
+    setScoreOffer(null);
+  };
+
+  const settlePendingScore = async () => {
+    const pending = pendingScoreRef.current;
+
+    if (!pending || scoreCommitRef.current) {
+      return;
+    }
+
+    scoreCommitRef.current = true;
+    pendingScoreRef.current = null;
+    setPendingHighScore(false);
+
+    const preview = await listHighScoreBoards();
+
+    if (preview.ok) {
+      showListedBoards(preview);
+
+      if (!stillOnBoard(pending.score, preview.boards)) {
+        dropPendingScore();
+        if (frozenRef.current) {
+          setBoardMoved(true);
+        }
+        return;
+      }
+    }
+
+    const result = await submitHighScore({
+      name: anonymousName,
+      score: pending.score,
+      level: pending.level,
+      elapsedMs: pending.elapsedMs,
+      cleared: pending.won,
+    });
+
+    if (!result.ok) {
+      return;
+    }
+
+    const listed = await listHighScoreBoards();
+
+    if (listed.ok) {
+      showListedBoards(listed, result.row.id);
+    }
+  };
 
   useLayoutEffect(() => {
     const media = window.matchMedia('(hover: hover) and (pointer: fine)');
@@ -962,6 +1179,126 @@ export const Tiggl = () => {
     media.addEventListener('change', sync);
     return () => media.removeEventListener('change', sync);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setScoresLoading(true);
+
+    void listHighScoreBoards().then(result => {
+      if (cancelled) {
+        return;
+      }
+
+      setScoresLoading(false);
+
+      if (result.ok) {
+        setScoreBoardsRows(result.boards);
+        setPlayCounts(result.plays);
+        setScoresError(null);
+        return;
+      }
+
+      setScoreBoardsRows(emptyScoreBoards());
+      setPlayCounts(emptyPlayCounts());
+      setScoresError(result.error);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!frozen) {
+      playRecordedRef.current = false;
+      clearOfferReveal();
+      void settlePendingScore();
+      return;
+    }
+
+    let cancelled = false;
+    setScoresLoading(true);
+    scoreCommitRef.current = false;
+    const revealAt =
+      Date.now() +
+      (window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 0
+        : resultSettleMs);
+
+    const revealResult = (offer: ScoreOffer | null) => {
+      if (cancelled || !frozenRef.current) {
+        return;
+      }
+
+      if (offer && pendingOfferRef.current === offer) {
+        setScoreOffer(offer);
+      }
+    };
+
+    const load = async () => {
+      setBoardMoved(false);
+
+      if (!playRecordedRef.current && playStartedAtRef.current) {
+        playRecordedRef.current = true;
+        await recordPlay();
+      }
+
+      const result = await listHighScoreBoards();
+
+      if (cancelled) {
+        return;
+      }
+
+      setScoresLoading(false);
+
+      if (!result.ok) {
+        setScoreBoardsRows(emptyScoreBoards());
+        setPlayCounts(emptyPlayCounts());
+        setScoresError(result.error);
+        dropPendingScore();
+        revealResult(null);
+        return;
+      }
+
+      setScoresError(null);
+      setScoreBoardsRows(result.boards);
+      setPlayCounts(result.plays);
+
+      const offer = offerForNewScore({
+        score: scoreRef.current,
+        monthly: result.boards.monthly,
+        allTime: result.boards.allTime,
+      });
+
+      if (offer) {
+        pendingOfferRef.current = offer;
+        setScoreBoard(offer.board);
+        pendingScoreRef.current = pendingCaptureRef.current ?? {
+          score: scoreRef.current,
+          level: levelRef.current,
+          elapsedMs,
+          won,
+        };
+        setPendingHighScore(true);
+      } else {
+        dropPendingScore();
+      }
+
+      offerTimerRef.current = window.setTimeout(
+        () => {
+          revealResult(offer);
+        },
+        Math.max(0, revealAt - Date.now()),
+      );
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+      clearOfferReveal();
+    };
+  }, [frozen]);
 
   useEffect(() => {
     if (!playing) {
@@ -1100,7 +1437,20 @@ export const Tiggl = () => {
     }
   };
 
-  const tossOntoTable = (resetClock = true) => {
+  const tossOntoTable = (resetClock = true, fromVisual = false) => {
+    const previous = fromVisual
+      ? squaresRef.current.map((square, index) => {
+          const particle = simRef.current[index];
+          const x = particle ? particle.x : restOf(square).x;
+          const y = particle ? particle.y : restOf(square).y;
+
+          return {
+            x: x + square.size / 2,
+            y: y + square.size / 2,
+          };
+        })
+      : null;
+
     const layout = Array.from({ length: playCount }, () => ({
       size: 14 + Math.round(Math.random() * 34),
       right: 8 + Math.random() * 48,
@@ -1111,15 +1461,26 @@ export const Tiggl = () => {
     simRef.current = layout.map(() => ({ x: 0, y: 0, vx: 0, vy: 0 }));
     scatterTargetsRef.current = clusterOnTable(layout, simRef.current);
 
+    const origins = previous ? previous.map(() => ({ x: 0, y: 0 })) : null;
+
     for (let i = 0; i < layout.length; i += 1) {
       const particle = simRef.current[i];
       layout[i].right = boardWidth - particle.x - layout[i].size;
       layout[i].bottom = boardHeight - particle.y - layout[i].size;
-      particle.x = restOf(layout[i]).x;
-      particle.y = restOf(layout[i]).y;
+      const rest = restOf(layout[i]);
+      if (previous?.[i] && origins) {
+        particle.x = previous[i].x - layout[i].size / 2;
+        particle.y = previous[i].y - layout[i].size / 2;
+        origins[i] = { x: particle.x, y: particle.y };
+      } else {
+        particle.x = rest.x;
+        particle.y = rest.y;
+      }
       particle.vx = 0;
       particle.vy = 0;
     }
+
+    gatherFromRef.current = origins;
 
     squaresRef.current = layout;
     orderRef.current = squareOrder(layout);
@@ -1186,6 +1547,7 @@ export const Tiggl = () => {
     shownScoreRef.current = 0;
     paintHudScore(scoreNodeRef.current, 0);
     setScore(0);
+    resetNameEntry();
     startRef.current();
   };
 
@@ -1196,20 +1558,27 @@ export const Tiggl = () => {
 
     frozenRef.current = false;
     playingRef.current = true;
-    unlockAudio();
+    setPlaying(true);
+    setFrozen(false);
+    setWon(false);
+    setActiveList(current => current.map(() => false));
+    setFailedList(current => current.map(() => false));
+    setCaughtList(current => current.map(() => false));
     levelRef.current = 1;
     setLevel(1);
-    tossOntoTable(true);
-    beginCatcher(event);
-    armLevel();
     setElapsedMs(0);
     scoreRef.current = 0;
     shownScoreRef.current = 0;
     paintHudScore(scoreNodeRef.current, 0);
     setScore(0);
-    setPlaying(true);
-    setFrozen(false);
-    setWon(false);
+    resetNameEntry();
+    unlockAudio();
+    tossOntoTable(
+      true,
+      !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    );
+    beginCatcher(event);
+    armLevel();
     startRef.current();
   };
 
@@ -1223,7 +1592,14 @@ export const Tiggl = () => {
     hitsArmedRef.current = false;
     window.clearTimeout(graceTimerRef.current);
     const started = playStartedAtRef.current;
-    setElapsedMs(started ? Date.now() - started : 0);
+    const elapsed = started ? Date.now() - started : 0;
+    pendingCaptureRef.current = {
+      score: scoreRef.current,
+      level: levelRef.current,
+      elapsedMs: elapsed,
+      won: crash.length !== 2 && levelRef.current >= maxLevel,
+    };
+    setElapsedMs(elapsed);
     setScore(scoreRef.current);
     shownScoreRef.current = scoreRef.current;
     paintHudScore(scoreNodeRef.current, scoreRef.current);
@@ -1288,6 +1664,7 @@ export const Tiggl = () => {
     scatterPushedRef.current = false;
     scatterImpulseRef.current = null;
     scatterTargetsRef.current = null;
+    gatherFromRef.current = null;
     scatterLockedRef.current = false;
     levelClearingRef.current = false;
     levelPauseUntilRef.current = 0;
@@ -1331,6 +1708,7 @@ export const Tiggl = () => {
     setWon(false);
     setHasPlayed(false);
     runningRef.current = false;
+    resetNameEntry();
     startRef.current();
   };
 
@@ -1511,9 +1889,32 @@ export const Tiggl = () => {
       }
 
       if (holding) {
-        for (const particle of sim) {
+        const origins = gatherFromRef.current;
+        const gatherT = origins
+          ? Math.min(
+              1,
+              Math.max(
+                0,
+                (now - (holdUntilRef.current - holdMs)) / replayGatherMs,
+              ),
+            )
+          : 1;
+        const gather = gatherT * gatherT * (3 - 2 * gatherT);
+
+        for (let i = 0; i < sim.length; i += 1) {
+          const particle = sim[i];
+          const origin = origins?.[i];
+          if (origin) {
+            const rest = restOf(layout[i]);
+            particle.x = origin.x + (rest.x - origin.x) * gather;
+            particle.y = origin.y + (rest.y - origin.y) * gather;
+          }
           particle.vx = 0;
           particle.vy = 0;
+        }
+
+        if (origins && gatherT >= 1) {
+          gatherFromRef.current = null;
         }
       }
 
@@ -1845,210 +2246,321 @@ export const Tiggl = () => {
     };
   }, []);
 
+  const saveHighScore = async (name: string) => {
+    const pending = pendingScoreRef.current;
+
+    if (!pending || scoreCommitRef.current) {
+      return;
+    }
+
+    scoreCommitRef.current = true;
+    setSavingName(true);
+    setNameError(null);
+
+    const preview = await listHighScoreBoards();
+
+    if (preview.ok) {
+      showListedBoards(preview);
+
+      if (!stillOnBoard(pending.score, preview.boards)) {
+        dropPendingScore();
+        setSavingName(false);
+        if (frozenRef.current) {
+          setBoardMoved(true);
+        }
+        return;
+      }
+    }
+
+    const result = await submitHighScore({
+      name,
+      score: pending.score,
+      level: pending.level,
+      elapsedMs: pending.elapsedMs,
+      cleared: pending.won,
+    });
+
+    setSavingName(false);
+
+    if (!result.ok) {
+      scoreCommitRef.current = false;
+      setNameError(result.error);
+      return;
+    }
+
+    pendingScoreRef.current = null;
+    pendingCaptureRef.current = null;
+    setPendingHighScore(false);
+
+    const listed = await listHighScoreBoards();
+
+    if (listed.ok) {
+      showListedBoards(listed, result.row.id);
+    } else {
+      setScoreBoardsRows({
+        monthly: [result.row],
+        allTime: [result.row],
+      });
+      setPlayCounts(emptyPlayCounts());
+      setScoresError(listed.error);
+    }
+  };
+
   const resultLabel = won
     ? `Clear! ${formatScore(score)} points, ten levels, ${playTimeLabel(elapsedMs)}`
     : `TIG! You're caught! ${formatScore(score)} points, level ${level}, ${playTimeLabel(elapsedMs)}`;
 
   return (
-    <div
-      className={`relative isolate shrink-0 overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50${playing || frozen ? ' catch-playing' : ''}`}
-      style={{ width: boardWidth, height: boardHeight }}
-    >
-      <div
-        ref={overlayRef}
-        className={`hero-squares pointer-events-none absolute inset-0 z-0 overflow-hidden${playing || frozen ? ' is-playing' : ''}`}
-      >
-        {squares.map((square, index) => (
-          <span
-            key={index}
-            ref={node => {
-              nodesRef.current[index] = node;
-            }}
-            className={`hero-square absolute${
-              failedList[index]
-                ? ' is-crash'
-                : frozen && activeList[index]
-                  ? ' is-active'
-                  : caughtList[index]
-                    ? ' is-caught'
+    <div className="flex items-start gap-4">
+      <div className="flex flex-col gap-3">
+        <div
+          className={`relative shrink-0 overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]${playing || frozen ? ' catch-playing' : ''}`}
+          style={{ width: boardWidth, height: boardHeight }}
+        >
+          <div
+            ref={overlayRef}
+            className={`hero-squares pointer-events-none absolute inset-0 z-0 overflow-hidden${playing || frozen ? ' is-playing' : ''}${frozen ? ' is-results' : ''}`}
+          >
+            {squares.map((square, index) => (
+              <span
+                key={index}
+                ref={node => {
+                  nodesRef.current[index] = node;
+                }}
+                className={`hero-square absolute${
+                  failedList[index]
+                    ? ' is-crash'
+                    : frozen && activeList[index]
+                      ? ' is-active'
+                      : caughtList[index]
+                        ? ' is-caught'
+                        : ''
+                }${
+                  frozen && !failedList[index] && !activeList[index]
+                    ? ' is-dim'
                     : ''
-            }${
-              frozen && !failedList[index] && !activeList[index]
-                ? ' is-dim'
-                : ''
-            }`}
-            aria-hidden
-            style={{
-              width: square.size,
-              height: square.size,
-              right: square.right,
-              bottom: square.bottom,
-              ...(caughtList[index] ||
-              failedList[index] ||
-              (frozen && activeList[index])
-                ? {}
-                : {
-                    boxShadow: `0 0 0 1px rgb(255 255 255 / ${0.22 + square.opacity})`,
-                  }),
-            }}
-          />
-        ))}
-      </div>
-      <span ref={catcherRef} className="hero-catcher" aria-hidden />
-      {canPlay && (playing || frozen) ? (
-        <div className="pointer-events-none absolute top-8 left-12 z-30">
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-2 font-display text-sm leading-none text-zinc-50 [text-shadow:0_1px_10px_rgb(0_0_0/0.85)]">
-            <span className="bg-white px-2 py-1 text-sm font-semibold text-zinc-950 [text-shadow:none]">
-              Tiggl
-            </span>
-            <span
-              className="text-[11px] leading-none text-zinc-500"
-              aria-hidden
-            >
-              ·
-            </span>
-            <span className="tabular-nums" aria-live="polite">
-              Level {level}
-            </span>
-            <span
-              className="text-[11px] leading-none text-zinc-500"
-              aria-hidden
-            >
-              ·
-            </span>
-            <HudScore nodeRef={scoreNodeRef} />
-            {playing ? (
-              <>
-                <span
-                  className="text-[11px] leading-none text-zinc-500"
-                  aria-hidden
-                >
-                  ·
-                </span>
-                <HudLeftover nodeRef={leftoverNodeRef} />
-                <span
-                  className="text-[11px] leading-none text-zinc-500"
-                  aria-hidden
-                >
-                  ·
-                </span>
-                <span className="font-sans text-[11px] leading-none font-normal text-zinc-400">
-                  {`Avoid ${badsOnLevel(level)} bad egg${badsOnLevel(level) === 1 ? '' : 's'} without crashing.`}
-                </span>
-              </>
-            ) : null}
-          </p>
-        </div>
-      ) : null}
-      {canPlay === true && !playing && !frozen && !hasPlayed ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-12 py-12">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-semibold tracking-[0.28em] text-zinc-400 uppercase">
-              Tay Digital
-            </p>
-            <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
-              Tiggl
-            </h1>
-            <p className="mt-2 font-mono text-[11px] tabular-nums text-zinc-500">
-              v{version}
-            </p>
-            <p className="mt-4 max-w-md text-pretty text-zinc-300">
-              Chase the circles through ten levels. Avoid the bad eggs — a bump
-              will crash the round.
-            </p>
-            <button
-              type="button"
-              onClick={startRound}
-              className="pointer-events-auto mt-8 bg-brand px-10 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 motion-reduce:transition-none"
-            >
-              Play Tiggl
-            </button>
+                }`}
+                aria-hidden
+                style={{
+                  width: square.size,
+                  height: square.size,
+                  right: square.right,
+                  bottom: square.bottom,
+                  ...(caughtList[index] ||
+                  failedList[index] ||
+                  (frozen && activeList[index])
+                    ? {}
+                    : {
+                        boxShadow: `0 0 0 1px rgb(255 255 255 / ${0.22 + square.opacity})`,
+                      }),
+                }}
+              />
+            ))}
           </div>
-        </div>
-      ) : null}
-      {canPlay === false && !playing && !frozen ? (
-        <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-end px-12 py-12">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-semibold tracking-[0.28em] text-zinc-400 uppercase">
-              Tay Digital
-            </p>
-            <h1 className="mt-3 font-display text-7xl font-semibold tracking-tight text-white">
-              Tiggl
-            </h1>
-            <p className="mt-2 font-mono text-[11px] tabular-nums text-zinc-500">
-              v{version}
-            </p>
-            <p className="mt-4 max-w-md text-pretty text-zinc-300">
-              This version needs a mouse or trackpad. Open it on a computer to
-              play.
-            </p>
-          </div>
-        </div>
-      ) : null}
-      {canPlay && (playing || frozen) ? (
-        <div className="pointer-events-none absolute inset-x-12 bottom-8 z-30 flex flex-wrap items-center gap-x-6 gap-y-2">
-          {frozen ? (
-            <p
-              className="flex items-center gap-3 bg-brand px-4 py-2 text-white"
-              aria-label={resultLabel}
-            >
-              <span className="text-[11px] font-semibold tracking-widest uppercase">
-                {won ? 'Clear' : 'TIG!'}
-              </span>
-              <span className="text-[11px] font-semibold">
-                {won ? 'Ten levels.' : "You're caught!"}
-              </span>
-              <span
-                className="text-[11px] leading-none text-white/50"
-                aria-hidden
-              >
-                ·
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="font-display text-lg leading-none font-semibold tabular-nums">
-                  {formatScore(score)}
-                </span>
-                <span className="text-[11px] font-semibold tracking-widest uppercase">
-                  pts
-                </span>
-              </span>
-              <span
-                className="text-[11px] leading-none text-white/50"
-                aria-hidden
-              >
-                ·
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="text-[11px] font-semibold tracking-widest uppercase">
-                  Level
-                </span>
-                <span className="font-display text-lg leading-none font-semibold tabular-nums">
-                  {level}
-                </span>
-              </span>
-              <span
-                className="text-[11px] leading-none text-white/50"
-                aria-hidden
-              >
-                ·
-              </span>
-              <span className="font-display text-lg leading-none font-semibold tabular-nums">
-                {formatPlayTime(elapsedMs)}
-              </span>
-            </p>
+          <span ref={catcherRef} className="hero-catcher" aria-hidden />
+          {celebration ? (
+            <ScoreCelebration
+              key={`${celebration.board}-${celebration.rank}`}
+              board={celebration.board}
+              rank={celebration.rank}
+              active
+            />
           ) : null}
-          <div className="flex items-center gap-4">
-            {frozen ? (
-              <button type="button" onClick={replayRound} className={playLink}>
-                Replay
-              </button>
-            ) : null}
-            <button type="button" onClick={exitGame} className={playLink}>
-              Exit
-            </button>
-          </div>
+          {canPlay && (playing || frozen) ? (
+            <div className="pointer-events-none absolute top-8 left-12 z-30">
+              <p className="flex flex-wrap items-center gap-x-3 gap-y-2 font-display text-sm leading-none text-zinc-50 [text-shadow:0_1px_10px_rgb(0_0_0/0.85)]">
+                <span className="bg-white px-2 py-1 text-sm font-semibold text-zinc-950 [text-shadow:none]">
+                  Tiggl
+                </span>
+                <span
+                  className="text-[11px] leading-none text-zinc-500"
+                  aria-hidden
+                >
+                  ·
+                </span>
+                <span className="tabular-nums" aria-live="polite">
+                  Level {level}
+                </span>
+                <span
+                  className="text-[11px] leading-none text-zinc-500"
+                  aria-hidden
+                >
+                  ·
+                </span>
+                <HudScore nodeRef={scoreNodeRef} />
+                {playing ? (
+                  <>
+                    <span
+                      className="text-[11px] leading-none text-zinc-500"
+                      aria-hidden
+                    >
+                      ·
+                    </span>
+                    <HudLeftover nodeRef={leftoverNodeRef} />
+                    <span
+                      className="text-[11px] leading-none text-zinc-500"
+                      aria-hidden
+                    >
+                      ·
+                    </span>
+                    <span className="font-sans text-[11px] leading-none font-normal text-zinc-400">
+                      {`Avoid ${badsOnLevel(level)} bad egg${badsOnLevel(level) === 1 ? '' : 's'} without crashing.`}
+                    </span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          ) : null}
+          {canPlay === true && !playing && !frozen && !hasPlayed ? (
+            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-start px-12 py-12">
+              <div className="max-w-2xl">
+                <h1 className="font-display text-7xl font-semibold tracking-tight text-white">
+                  Tiggl.
+                </h1>
+                <p className="mt-8 max-w-2xl text-pretty text-lg leading-relaxed text-zinc-300">
+                  Move the mouse to steer the puck and collect the circles.
+                  Sweep through the good ones but don’t let a nudge turn into a
+                  crash! The first level isn’t a tutorial — it’s where most
+                  rounds end.
+                </p>
+                <button
+                  type="button"
+                  onClick={startRound}
+                  className="pointer-events-auto mt-10 bg-brand px-14 py-4 text-base font-semibold text-white transition-colors hover:bg-brand/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 motion-reduce:transition-none"
+                >
+                  Play Tiggl
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {canPlay === false && !playing && !frozen ? (
+            <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-start px-12 py-12">
+              <div className="max-w-2xl">
+                <h1 className="font-display text-7xl font-semibold tracking-tight text-white">
+                  Tiggl.
+                </h1>
+                <p className="mt-8 max-w-2xl text-pretty text-lg leading-relaxed text-zinc-300">
+                  This version needs a mouse or trackpad. Open it on a computer
+                  to play.
+                </p>
+              </div>
+            </div>
+          ) : null}
+          {canPlay && (playing || frozen) ? (
+            <div className="pointer-events-none absolute inset-x-12 bottom-8 z-30 flex items-center gap-8">
+              {canPlay && (playing || frozen) ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2">
+                  {frozen ? (
+                    <p
+                      className={`flex h-11 items-center gap-3 px-4 ${
+                        madeTen
+                          ? 'bg-[#f0c75e] text-zinc-950'
+                          : 'bg-brand text-white'
+                      }`}
+                      aria-label={resultLabel}
+                    >
+                      <span className="text-[11px] font-semibold tracking-widest uppercase">
+                        {won ? 'Clear' : 'TIG!'}
+                      </span>
+                      <span className="text-[11px] font-semibold">
+                        {won ? 'Ten levels.' : "You're caught!"}
+                      </span>
+                      <span
+                        className={`text-[11px] leading-none ${
+                          madeTen ? 'text-zinc-950/40' : 'text-white/50'
+                        }`}
+                        aria-hidden
+                      >
+                        ·
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="font-display text-lg leading-none font-semibold tabular-nums">
+                          {formatScore(score)}
+                        </span>
+                        <span className="text-[11px] font-semibold tracking-widest uppercase">
+                          pts
+                        </span>
+                      </span>
+                      <span
+                        className={`text-[11px] leading-none ${
+                          madeTen ? 'text-zinc-950/40' : 'text-white/50'
+                        }`}
+                        aria-hidden
+                      >
+                        ·
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-semibold tracking-widest uppercase">
+                          Level
+                        </span>
+                        <span className="font-display text-lg leading-none font-semibold tabular-nums">
+                          {level}
+                        </span>
+                      </span>
+                      <span
+                        className={`text-[11px] leading-none ${
+                          madeTen ? 'text-zinc-950/40' : 'text-white/50'
+                        }`}
+                        aria-hidden
+                      >
+                        ·
+                      </span>
+                      <span className="font-display text-lg leading-none font-semibold tabular-nums">
+                        {formatPlayTime(elapsedMs)}
+                      </span>
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-4">
+                    {frozen ? (
+                      <button
+                        type="button"
+                        onClick={replayRound}
+                        className={playLink}
+                      >
+                        Replay
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={exitGame}
+                      className={playLink}
+                    >
+                      Exit
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+              <div className="ml-auto flex items-center">
+                {frozen && pendingHighScore && scoreOffer ? (
+                  <HighScoreEntry
+                    offer={scoreOffer}
+                    saving={savingName}
+                    nameError={nameError}
+                    onSave={saveHighScore}
+                    onSkip={() => {
+                      void settlePendingScore();
+                    }}
+                  />
+                ) : null}
+                {frozen && boardMoved && !pendingHighScore ? (
+                  <p className="whitespace-nowrap text-[11px] leading-none text-zinc-400">
+                    {scoreMovedCopy}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      </div>
+      <HighScores
+        board={scoreBoard}
+        rows={scoreBoardsRows[scoreBoard]}
+        highlightId={scoreHighlightId}
+        listError={scoresError}
+        loading={scoresLoading}
+        plays={playCounts}
+        onBoardChange={setScoreBoard}
+      />
     </div>
   );
 };

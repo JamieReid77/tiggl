@@ -36,6 +36,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Role passwords and dumps. Never commit these.
+secrets/
+*.dump
+
 # vercel
 .vercel
 

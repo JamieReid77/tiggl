@@ -56,7 +56,7 @@ const RootLayout = ({ children }: LayoutProps<'/'>) => {
         geistMono.variable,
       )}
     >
-      <body className="min-h-dvh bg-zinc-900 font-sans text-zinc-50">
+      <body className="min-h-dvh bg-[#030304] font-sans text-zinc-50">
         {children}
         <Analytics />
       </body>

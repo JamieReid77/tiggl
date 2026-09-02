@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "appSlug": "tiggl",
+  "databaseProvider": "supabase-postgres",
+  "databaseName": "postgres",
+  "projectRef": "bppqtotktgchvitcmbmj",
+  "projectName": "supabase-tay-digital",
+  "sourceProjectRef": "demoncuydrwqdcmpyzac",
+  "sourceProjectName": "supabase-watchlist-buddy",
+  "schemas": {
+    "domain": "tiggl",
+    "auth": "tiggl_auth"
+  },
+  "roles": {
+    "owner": "tiggl_owner",
+    "runtime": "tiggl_runtime",
+    "migrator": "tiggl_migrator"
+  },
+  "authentication": {
+    "provider": "none",
+    "schema": "tiggl_auth",
+    "sharedWithOtherApps": false,
+    "note": "Tiggl has no users and will not use Better Auth. tiggl_auth stays empty."
+  },
+  "dataApi": {
+    "enabled": false
+  },
+  "storageBucketPrefixes": ["tiggl_"],
+  "migrationDirectory": "db/migrations",
+  "crossAppDependencies": [],
+  "status": "schema_migrated",
+  "dataMigrationStatus": "copied_app_repo_cutover"
+}
