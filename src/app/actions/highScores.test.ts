@@ -123,6 +123,52 @@ describe('high score actions', () => {
     expect(sql).toHaveBeenCalled();
   });
 
+  it('saves a skipped name as blank', async () => {
+    sql.mockResolvedValueOnce([{ ...jamie, player_name: '' }]);
+
+    const result = await submitHighScore({
+      name: '',
+      score: 100,
+      level: 1,
+      elapsedMs: 1000,
+      cleared: false,
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      row: {
+        id: jamie.id,
+        playerName: '',
+        score: 1250,
+        level: 4,
+        elapsedMs: 65_000,
+        cleared: false,
+        createdAt: jamie.created_at,
+      },
+    });
+  });
+
+  it('shows a stored ANON name as blank', async () => {
+    sql.mockResolvedValueOnce([{ ...jamie, player_name: 'ANON' }]);
+
+    const result = await listHighScores('allTime');
+
+    expect(result).toEqual({
+      ok: true,
+      rows: [
+        {
+          id: jamie.id,
+          playerName: '',
+          score: 1250,
+          level: 4,
+          elapsedMs: 65_000,
+          cleared: false,
+          createdAt: jamie.created_at,
+        },
+      ],
+    });
+  });
+
   it('maps the normalize trigger message', async () => {
     sql.mockRejectedValueOnce(new Error('Choose a different name'));
 

@@ -1,11 +1,12 @@
-import { anonymousName, parsePlayerName } from './playerName';
+import {
+  displayPlayerName,
+  legacyAnonymousName,
+  parsePlayerName,
+} from './playerName';
 
 describe('parsePlayerName', () => {
   it('accepts arcade-length names', () => {
-    expect(parsePlayerName(anonymousName)).toEqual({
-      ok: true,
-      name: anonymousName,
-    });
+    expect(parsePlayerName('ada')).toEqual({ ok: true, name: 'ADA' });
     expect(parsePlayerName('jamie')).toEqual({ ok: true, name: 'JAMIE' });
     expect(parsePlayerName('abcdefghijklmno')).toEqual({
       ok: true,
@@ -17,9 +18,21 @@ describe('parsePlayerName', () => {
     });
   });
 
+  it('rejects a blank name on the entry form', () => {
+    expect(parsePlayerName('')).toEqual({
+      ok: false,
+      error: 'Enter a name',
+    });
+  });
+
   it('rejects names that are too short or too long', () => {
     expect(parsePlayerName('jo').ok).toBe(false);
     expect(parsePlayerName('abcdefghijklmnop').ok).toBe(false);
+  });
+
+  it('shows a skipped name as blank', () => {
+    expect(displayPlayerName(legacyAnonymousName)).toBe('');
+    expect(displayPlayerName('JAMIE')).toBe('JAMIE');
   });
 
   it('rejects punctuation', () => {

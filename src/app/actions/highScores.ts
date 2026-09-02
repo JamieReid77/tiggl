@@ -17,7 +17,11 @@ import {
   recordLocalPlay,
   submitLocalScore,
 } from '@/lib/highScores.local';
-import { parsePlayerName } from '@/lib/playerName';
+import {
+  anonymousName,
+  displayPlayerName,
+  parsePlayerName,
+} from '@/lib/playerName';
 
 type HighScoreRow = {
   id: string;
@@ -51,7 +55,7 @@ const toIso = (value: Date | string) =>
 
 const toHighScore = (row: HighScoreRow): HighScore => ({
   id: row.id,
-  playerName: row.player_name,
+  playerName: displayPlayerName(row.player_name),
   score: row.score,
   level: row.level,
   elapsedMs: row.elapsed_ms,
@@ -225,7 +229,10 @@ export const submitHighScore = async ({
   elapsedMs: number;
   cleared: boolean;
 }): Promise<HighScoreSubmitResult> => {
-  const parsed = parsePlayerName(name);
+  const parsed =
+    name.trim() === ''
+      ? { ok: true as const, name: anonymousName }
+      : parsePlayerName(name);
 
   if (!parsed.ok) {
     return parsed;

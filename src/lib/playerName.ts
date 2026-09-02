@@ -1,6 +1,10 @@
 export const nameMinLength = 3;
 export const nameMaxLength = 15;
-export const anonymousName = 'ANON';
+export const anonymousName = '';
+export const legacyAnonymousName = 'ANON';
+
+export const displayPlayerName = (name: string) =>
+  name === legacyAnonymousName ? anonymousName : name;
 
 const blockedNames = new Set([
   'ANAL',
