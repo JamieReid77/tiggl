@@ -1,7 +1,7 @@
 export const siteName = 'Tiggl';
 export const siteUrl = 'https://tiggl.app';
 export const siteDescription =
-  'Chase the circles through ten levels. Avoid the bad eggs — a bump will crash the round.';
+  'Move the mouse to steer the puck and collect the circles. Sweep through the good ones but don’t let a nudge turn into a crash! The first level isn’t a tutorial — it’s where most rounds end.';
 
 export const siteOgImage = {
   url: '/og-card.png',

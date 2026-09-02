@@ -49,6 +49,7 @@ import {
   type ScoreOffer,
 } from '@/lib/highScores';
 import { anonymousName } from '@/lib/playerName';
+import { siteDescription } from '@/lib/site';
 
 const gap = 8;
 const spring = 0.04;
@@ -2441,12 +2442,7 @@ export const Tiggl = () => {
             <div className={introShell}>
               <div className="max-w-2xl">
                 <Wordmark as="h1" className={introTitle} />
-                <p className={introCopy}>
-                  Move the mouse to steer the puck and collect the circles.
-                  Sweep through the good ones but don’t let a nudge turn into a
-                  crash! The first level isn’t a tutorial — it’s where most
-                  rounds end.
-                </p>
+                <p className={introCopy}>{siteDescription}</p>
                 <button
                   type="button"
                   onClick={startRound}
