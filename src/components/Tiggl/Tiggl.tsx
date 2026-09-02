@@ -20,6 +20,7 @@ import {
   HighScores,
   ScoreCelebration,
 } from '@/components/HighScores';
+import { Wordmark } from '@/components/Wordmark';
 import {
   badsOnLevel,
   badsPerLevel,
@@ -48,6 +49,7 @@ import {
   type ScoreOffer,
 } from '@/lib/highScores';
 import { anonymousName } from '@/lib/playerName';
+
 const gap = 8;
 const spring = 0.04;
 const damping = 0.82;
@@ -979,7 +981,7 @@ const blockedShell =
   'relative z-20 flex flex-col justify-start px-5 py-8 sm:px-10 sm:py-10 md:px-12 md:py-12';
 
 const introTitle =
-  'font-display text-4xl font-semibold tracking-tight text-white sm:text-6xl md:text-7xl';
+  'font-display text-4xl font-bold tracking-tight text-white sm:text-6xl md:text-7xl';
 
 const introCopy =
   'mt-4 max-w-2xl text-pretty text-base leading-relaxed text-zinc-300 sm:mt-8 sm:text-lg';
@@ -2395,9 +2397,7 @@ export const Tiggl = () => {
           {canPlay && (playing || frozen) ? (
             <div className="pointer-events-none absolute top-8 left-12 z-30">
               <p className="flex flex-wrap items-center gap-x-3 gap-y-2 font-display text-sm leading-none text-zinc-50 [text-shadow:0_1px_10px_rgb(0_0_0/0.85)]">
-                <span className="bg-white px-2 py-1 text-sm font-semibold text-zinc-950 [text-shadow:none]">
-                  Tiggl
-                </span>
+                <Wordmark boxed />
                 <span
                   className="text-[11px] leading-none text-zinc-500"
                   aria-hidden
@@ -2440,7 +2440,7 @@ export const Tiggl = () => {
           {canPlay === true && !playing && !frozen && !hasPlayed ? (
             <div className={introShell}>
               <div className="max-w-2xl">
-                <h1 className={introTitle}>Tiggl.</h1>
+                <Wordmark as="h1" className={introTitle} />
                 <p className={introCopy}>
                   Move the mouse to steer the puck and collect the circles.
                   Sweep through the good ones but don’t let a nudge turn into a
@@ -2460,7 +2460,7 @@ export const Tiggl = () => {
           {canPlay === false && !playing && !frozen ? (
             <div className={blockedShell}>
               <div className="max-w-2xl">
-                <h1 className={introTitle}>Tiggl.</h1>
+                <Wordmark as="h1" className={introTitle} />
                 <p className={introCopy}>
                   This version needs a mouse or trackpad. Open it on a computer
                   to play.
