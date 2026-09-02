@@ -107,6 +107,14 @@ export const HighScoreEntry = ({
           {saving ? 'Saving' : 'Save'}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={() => onSkip?.()}
+        disabled={saving}
+        className="text-[11px] text-zinc-400 underline decoration-zinc-500 underline-offset-4 transition-colors hover:text-zinc-100 hover:no-underline focus-visible:text-white focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950 disabled:opacity-60 motion-reduce:transition-none"
+      >
+        Skip
+      </button>
       {error ? (
         <p id={errorId} className="text-[11px] text-red-400" role="alert">
           {error}

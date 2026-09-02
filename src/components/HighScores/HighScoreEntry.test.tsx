@@ -41,4 +41,20 @@ describe('HighScoreEntry', () => {
       screen.getByLabelText('You made the ALL TIME top ten'),
     ).toBeInTheDocument();
   });
+
+  it('lets the player skip name entry', async () => {
+    const user = userEvent.setup();
+    const onSkip = jest.fn();
+
+    render(
+      <HighScoreEntry
+        offer={{ board: 'monthly', rank: 4 }}
+        onSave={() => {}}
+        onSkip={onSkip}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
+    expect(onSkip).toHaveBeenCalledTimes(1);
+  });
 });

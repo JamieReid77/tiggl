@@ -2339,7 +2339,9 @@ export const Tiggl = () => {
         className={blocked ? 'flex min-w-0 flex-col' : 'flex flex-col gap-3'}
       >
         <div
-          className={`relative overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)]${playing || frozen ? ' catch-playing' : ''}${
+          id="tiggl-game"
+          tabIndex={-1}
+          className={`relative overflow-hidden border border-zinc-800 bg-zinc-950 text-zinc-50 shadow-[0_10px_28px_rgb(0_0_0_/_0.4)] outline-none${playing || frozen ? ' catch-playing' : ''}${
             blocked ? ' h-auto w-full lg:h-full' : ' shrink-0'
           }`}
           style={
@@ -2394,6 +2396,9 @@ export const Tiggl = () => {
               rank={celebration.rank}
               active
             />
+          ) : null}
+          {canPlay && (playing || frozen) ? (
+            <h1 className="sr-only">Tiggl.</h1>
           ) : null}
           {canPlay && (playing || frozen) ? (
             <div className="pointer-events-none absolute top-8 left-12 z-30">

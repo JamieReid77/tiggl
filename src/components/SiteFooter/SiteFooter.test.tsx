@@ -8,7 +8,9 @@ describe('SiteFooter', () => {
 
     expect(screen.getByText('Tiggl')).toBeInTheDocument();
     expect(screen.getByText(/is an original game by/)).toBeInTheDocument();
-    const tayDigital = screen.getByRole('link', { name: 'Tay Digital' });
+    const tayDigital = screen.getByRole('link', {
+      name: 'Tay Digital (opens in a new tab)',
+    });
     expect(tayDigital).toHaveAttribute('href', 'https://taydigital.co.uk');
     expect(tayDigital).toHaveAttribute('target', '_blank');
     expect(tayDigital).toHaveAttribute('rel', 'noopener noreferrer');

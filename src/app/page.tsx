@@ -4,6 +4,12 @@ import { siteDescription, siteName, siteOgImage, siteUrl } from '@/lib/site';
 
 const Home = () => (
   <>
+    <a
+      href="#tiggl-game"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-zinc-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+    >
+      Skip to game
+    </a>
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{

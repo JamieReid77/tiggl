@@ -12,6 +12,7 @@ export const Wordmark = ({
   boxed = false,
 }: WordmarkProps) => (
   <Comp
+    aria-label="Tiggl."
     className={cn(
       'font-display font-bold tracking-tight',
       boxed

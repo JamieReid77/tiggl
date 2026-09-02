@@ -12,7 +12,7 @@ describe('Wordmark', () => {
   it('renders as a heading when asked', () => {
     render(<Wordmark as="h1" />);
 
-    expect(screen.getByRole('heading', { name: 'Tiggl' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Tiggl.' })).toBeInTheDocument();
   });
 
   it('renders the boxed badge', () => {
